@@ -1,0 +1,12 @@
+logger:
+  level: "DEBUG"
+console:
+  port: 7351
+  username: "admin"
+  password: "password"
+socket:
+  server_key: "defaultkey"
+  port: 7350
+runtime:
+  env:
+    - "TIC_TAC_TOE_DEBUG=true"

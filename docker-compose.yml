@@ -1,0 +1,53 @@
+version: '3'
+services:
+  cockroachdb:
+    image: cockroachdb/cockroach:latest-v23.1
+    command: start-single-node --insecure --store=attrs=ram,path=/var/lib/cockroach/
+    restart: "no"
+    environment:
+      - COCKROACH_DATABASE=nakama
+      - COCKROACH_USER=root
+    ports:
+      - "26257:26257"
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "/cockroach/cockroach", "sql", "--insecure", "--host=localhost", "-e", "SELECT 1;"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  nakama:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    depends_on:
+      cockroachdb:
+        condition: service_healthy
+    entrypoint:
+      - "/bin/sh"
+      - "-ec"
+      - "/nakama/nakama migrate up --database.address root@cockroachdb:26257 && exec /nakama/nakama --config /nakama/data/local.yml --database.address root@cockroachdb:26257"
+    restart: "no"
+    ports:
+      - "7349:7349"
+      - "7350:7350"
+      - "7351:7351"
+    healthcheck:
+      test: ["CMD", "/nakama/nakama", "healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_NAKAMA_HOST: "127.0.0.1"
+        VITE_NAKAMA_PORT: "7350"
+    depends_on:
+      nakama:
+        condition: service_healthy
+    restart: "no"
+    ports:
+      - "5173:80"
