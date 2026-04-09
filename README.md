@@ -1,127 +1,73 @@
 # Tic-Tac-Toe Multiplayer (Go + React + Nakama)
 
-A production-ready, server-authoritative multiplayer Tic-Tac-Toe game using Nakama for real-time networking and matchmaking.
+## Deployment Links
+- **Accessible Game URL:** `[Insert deployed game URL or IP here, e.g., http://your-server-ip]`
+- **Deployed Nakama Server Endpoint:** `[Insert Nakama API URL or IP here, e.g., http://your-server-ip:7350]`
 
-## Stack
-- **Backend:** Go (Nakama Server Runtime)
-- **Database:** CockroachDB (via Docker)
-- **Frontend:** React (Vite, TypeScript, Vanilla CSS)
+---
 
-## Prerequisites
+## Architecture and Design Decisions
+- **Architecture Overview**: The application uses a Client-Server architecture. The backend acts as an authoritative source of truth to prevent cheating, validating all game moves securely on the server.
+- **Backend (Nakama + Go)**: Nakama handles the heavy lifting of user authentication, session management, and matchmaking. A Go plugin overrides Nakama's default match handler to implement custom Tic-Tac-Toe validation, maintaining state (board, turns, and timers) completely in-memory.
+- **Database (CockroachDB)**: CockroachDB is the native database choice for Nakama, offering a highly resilient distributed SQL store for user profiles, leaderboard scores, and authentication records.
+- **Frontend (React + TypeScript)**: The UI prioritizes a sleek responsive glassmorphism design. To keep it light and fast, it uses Vite as the build tool, native React state management, and direct integration with `@heroiclabs/nakama-js`.
+
+## API & Server Configuration Details
+- **Nakama Backend**: 
+  - API Port: `7350` (used by the web/mobile client to communicate)
+  - Admin Console Port: `7351`
+  - Admin Credentials (Default): `admin` / `password`
+- **CockroachDB**: Exposes port `26257` for internal DB traffic. 
+- **Environment Variables**:
+  - `VITE_NAKAMA_HOST`: Informs the React frontend where the Nakama API is located. If left empty, the frontend automatically falls back to `window.location.hostname`. This design provides seamless functionality when accessed remotely without requiring you to constantly update IP addresses.
+  - `DB_ADDRESS`: Connection string used by Nakama to talk to CockroachDB. Default: `root@cockroachdb:26257`
+
+## Setup and Installation Instructions
+
+### Prerequisites
 - Docker & Docker Compose
-- Node.js 18+ & npm
-- Go 1.21+ (if developing backend locally)
+- Node.js 18+ & npm (Optional: only if running frontend dev server locally apart from Docker)
 
-## Running Locally
+### Running Locally with Docker
+The entire project (Database, API, and React Web App via Nginx) is containerized and orchestrated via Docker Compose.
 
-### 1. Start the Backend
-The backend and frontend are containerized. A multi-stage Docker build compiles the Go plugin and mounts it into the Nakama server container automatically.
+1. Clone the repository to your machine.
+2. Open a terminal in the project root containing `docker-compose.yml`.
+3. Run the following command:
+   ```bash
+   docker compose up --build
+   ```
+   *(Add `-d` to run in detached mode).*
+4. Access the frontend app locally at `http://localhost` (or `http://127.0.0.1`).
 
+## How to Test the Multiplayer Functionality
+To accurately test the matchmaking and real-time multiplayer flow, follow these steps:
+1. Open two different browsers (e.g., Chrome and Firefox) or two incognito/private windows.
+2. Navigate to the game URL (`http://localhost` or your server IP) in both windows.
+3. In Window A, register a new account (e.g., `player1@example.com` / `password`).
+4. In Window B, register a second account (e.g., `player2@example.com` / `password`).
+5. Click **"Find Match"** in both windows simultaneously.
+6. The global matchmaking engine will pair both accounts instantly. You will be routed into a live game session.
+7. Verify that clicking a cell on one screen instantly reflects on the other. 
+8. Test timeout parameters by waiting 30 seconds without playing; the server will naturally forfeit the idle player. Complete a full game to observe board validation and leaderboard reporting.
+
+## Deployment Process Documentation
+The simplest way to deploy the entire production stack is on a cloud Linux Virtual Machine (AWS EC2, DigitalOcean Droplet, GCP Compute Engine). 
+
+### Single-Node VM Deployment
+1. **Provision a VM** with Docker and `docker-compose` installed. 
+2. **Configure Firewalls**: Ensure HTTP (Port 80) and the Nakama API (Port 7350) are exposed to the public internet. If using Azure/AWS, update the underlying Security Groups/Inbound rules.
+3. Clone the repository onto your server.
+4. Run the production docker-compose directly:
+   ```bash
+   docker compose up -d --build
+   ```
+5. **Auto-Resolution**: Since `docker-compose.yml` binds to port 80 and the application `nakama.ts` uses `window.location.hostname`, players visiting `http://<YOUR_VM_PUBLIC_IP>` will seamlessly have their WebSocket/API requests routed back to `<YOUR_VM_PUBLIC_IP>:7350`.
+
+*Note: For horizontal scaling in an Enterprise environment, the Nakama image should be deployed using Kubernetes (EKS/GKE), and CockroachDB would be shifted to a managed provider (CockroachDB Serverless).*
+
+### Local Teardown
+To gracefully stop the local servers and completely wipe the database volumes:
 ```bash
-docker compose up --build
-```
-This will start:
-- CockroachDB on port `26257`
-- Nakama Server on port `7350` (API) and `7351` (Developer Console, default admin/password)
-- Frontend web app on port `5173`
-
-### 2. Optional: Start Frontend in Dev Mode
-If you prefer local hot-reload instead of Docker-hosted frontend:
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-Open `http://localhost:5173` in your browser.
-
-## Features implemented
-
-- **Email Authentication:** Register or login using Nakama's native email identity.
-- **Matchmaking Engine:** Players are added to a global Nakama matchmaker queue.
-- **Server-Authoritative Gameplay:** A custom Go module spawns a dedicated Goroutine per match (`MatchLoop`), validating every move, preventing cheating, and detecting wins/draws.
-- **Timeout Logic:** If a player doesn't move within 30 seconds, they forfeit.
-- **Global Leaderboard:** Wins automatically increment a player's rank on the global leaderboard, displayed in the lobby.
-- **Responsive UI:** Premium glassmorphism design leveraging CSS variables, built with pure React.
-
-## Cloud Deployment Guide
-
-### Deploying the Nakama Backend (AWS / GCP / DigitalOcean)
-1. Provision a PostgreSQL / CockroachDB managed instance or run it on a VM.
-2. Build the Docker image from `backend/Dockerfile` and push it to a private container registry (ECR, GCR, DockerHub).
-3. Deploy the container on a managed service like AWS ECS, Google Cloud Run, or DigitalOcean App Platform.
-4. Set the `DB_ADDRESS` environment variable to point to your managed database.
-5. Expose ports `7350` for client traffic.
-
-### Deploying the React Frontend
-1. Change `SERVER_HOST` in `src/nakama.ts` to your production Nakama server IP or domain.
-2. Build the production assets:
-```bash
-cd frontend
-npm run build
-```
-3. Deploy the `dist/` folder to a static hosting provider like Vercel, Netlify, or AWS S3 + CloudFront.
-
-## Local Teardown
-To cleanly stop the local servers and wipe the database volumes:
-```bash
-docker-compose down -v
-```
-
-## Deployment Scripts (Windows PowerShell)
-
-### Local Environment
-Runs backend in Docker and starts the frontend dev server.
-
-```powershell
-.\deploy-local.ps1
-```
-
-Optional (skip `npm install`):
-
-```powershell
-.\deploy-local.ps1 -SkipFrontendInstall
-```
-
-### Production Environment
-Builds backend Docker services and generates frontend production assets in `frontend/dist`.
-
-```powershell
-.\deploy-production.ps1
-```
-
-Optional host/port for frontend build-time Nakama target:
-
-```powershell
-.\deploy-production.ps1 -FrontendApiHost "your-api-host" -FrontendApiPort "7350"
-```
-
-## Deployment Scripts (Bash)
-
-### Local Environment
-Runs backend in Docker and starts the frontend dev server.
-
-```bash
-chmod +x deploy-local.sh
-./deploy-local.sh
-```
-
-Optional (skip `npm install`):
-
-```bash
-./deploy-local.sh --skip-frontend-install
-```
-
-### Production Environment
-Builds backend Docker services and generates frontend production assets in `frontend/dist`.
-
-```bash
-chmod +x deploy-production.sh
-./deploy-production.sh
-```
-
-Optional host/port and skip install:
-
-```bash
-./deploy-production.sh --frontend-api-host=your-api-host --frontend-api-port=7350 --skip-frontend-install
+docker compose down -v
 ```
