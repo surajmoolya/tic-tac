@@ -27,7 +27,7 @@ services:
       - "/bin/sh"
       - "-ec"
       - "/nakama/nakama migrate up --database.address root@cockroachdb:26257 && exec /nakama/nakama --config /nakama/data/local.yml --database.address root@cockroachdb:26257"
-    restart: "no"
+    restart: "yes"
     ports:
       - "7349:7349"
       - "7350:7350"
@@ -47,6 +47,6 @@ services:
     depends_on:
       nakama:
         condition: service_healthy
-    restart: "no"
+    restart: "yes"
     ports:
-      - "5173:80"
+      - "80:80"
