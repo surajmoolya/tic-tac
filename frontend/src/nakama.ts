@@ -3,7 +3,7 @@ import type { Socket } from '@heroiclabs/nakama-js';
 
 const USE_SSL = false;
 const SERVER_KEY = 'defaultkey';
-const SERVER_HOST = import.meta.env.VITE_NAKAMA_HOST || '127.0.0.1';
+const SERVER_HOST = import.meta.env.VITE_NAKAMA_HOST || window.location.hostname;
 const SERVER_PORT = import.meta.env.VITE_NAKAMA_PORT || '7350';
 
 export class NakamaService {
