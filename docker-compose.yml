@@ -47,6 +47,6 @@ services:
     depends_on:
       nakama:
         condition: service_healthy
-    restart: "yes"
+    restart: "always"
     ports:
       - "80:80"
